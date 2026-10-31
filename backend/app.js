@@ -6,13 +6,14 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-// Socket.IO configuration
+// Allowed frontend origins
 const allowedOrigins = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
     process.env.CLIENT_URL
 ].filter(Boolean);
 
+// Socket.IO configuration
 const io = new Server(server, {
     cors: {
         origin: allowedOrigins,
@@ -20,7 +21,7 @@ const io = new Server(server, {
     }
 });
 
-// Backend health check
+// Health check
 app.get("/", (req, res) => {
     res.json({
         message: "LiveTracking API is running",
@@ -33,9 +34,19 @@ io.on("connection", (socket) => {
     console.log("Device connected:", socket.id);
 
     socket.on("send-location", (data) => {
+        const { latitude, longitude } = data;
+
+        if (
+            typeof latitude !== "number" ||
+            typeof longitude !== "number"
+        ) {
+            return;
+        }
+
         io.emit("receive-location", {
             id: socket.id,
-            ...data
+            latitude,
+            longitude
         });
     });
 
@@ -46,7 +57,7 @@ io.on("connection", (socket) => {
     });
 });
 
-// Render port configuration
+// Render port
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, "0.0.0.0", () => {
