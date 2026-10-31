@@ -1,28 +1,54 @@
+
 const express = require("express");
-const app = express();
-const path = require("path");
-
 const http = require("http");
+const { Server } = require("socket.io");
 
-const socketio = require("socket.io");
+const app = express();
 const server = http.createServer(app);
-const io = socketio(server);
 
-const frontendPath = path.join(__dirname, "..", "frontend");
-app.use(express.static(frontendPath));
+// Socket.IO configuration
+const allowedOrigins = [
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    process.env.CLIENT_URL
+].filter(Boolean);
 
-io.on("connection", function (socket){
-  socket.on("send-location", function (data){
-    io.emit("receive-location", { id:socket.id, ...data});
-  });
-  
-socket.on("disconnect", function (){
-  io.emit("user-disconnected", socket.id);
-});
-});
-
-app.get("/", function(req, res){
-  res.sendFile(path.join(frontendPath, "index.html"));
+const io = new Server(server, {
+    cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST"]
+    }
 });
 
-server.listen(3000);
+// Backend health check
+app.get("/", (req, res) => {
+    res.json({
+        message: "LiveTracking API is running",
+        status: "success"
+    });
+});
+
+// Socket.IO connection
+io.on("connection", (socket) => {
+    console.log("Device connected:", socket.id);
+
+    socket.on("send-location", (data) => {
+        io.emit("receive-location", {
+            id: socket.id,
+            ...data
+        });
+    });
+
+    socket.on("disconnect", () => {
+        console.log("Device disconnected:", socket.id);
+
+        io.emit("user-disconnected", socket.id);
+    });
+});
+
+// Render port configuration
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+});
